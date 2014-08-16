@@ -1,5 +1,5 @@
 
-#include <msp430g2211.h>
+#include <msp430g2231.h>
 
 /* Demo UART application.  Receives bytes from the computer
  * at 2400 bps, and sends the same byte back to the computer.
@@ -21,17 +21,22 @@
 
 unsigned int TXWord = 0;
 unsigned char RXByte = 0;
-unsigned int rxbitcnt = 0;
-unsigned int txbitcnt = 0;
+unsigned int rx_bitcnt = 0;
+unsigned int tx_bitcnt = 0;
 
 /* a circular buffer to for characters received/to send */
 #define BSIZE 16                // must be power of 2
-unsigned char buffer[BSIZE];
-unsigned int bhead=0, btail=0, bytestosend=0;
+unsigned char rx_buffer[BSIZE];
+unsigned char tx_buffer[BSIZE];
+volatile unsigned int rx_bhead=0, rx_btail=0, tx_bhead=0, tx_btail=0;
 
 /* function prototypes */
 void initUart( void );
 inline void RX_Start( void );
+unsigned int rx_size( void );
+unsigned int tx_size( void );
+unsigned char uartGetChar( void );
+int uartPutChar( unsigned char );
 
 void main(void) {
     /* stop the watchdog timer */
@@ -47,6 +52,10 @@ void main(void) {
     RX_Start();
 
     for( ; ; ) {
+        //if( rx_btail != rx_bhead ) {
+        if(rx_size() > 0) {
+            uartPutChar(uartGetChar());
+        }
         /* go to sleep and wait for data */
         __bis_SR_register( LPM0_bits + GIE );
     }
@@ -70,14 +79,62 @@ void initUart( void ) {
     P1DIR |= TXD;
 }
 
+unsigned char uartGetChar( void ) {
+    //if( rx_btail != rx_bhead ) {
+    if(rx_size() > 0) {
+        unsigned char rx_char = rx_buffer[rx_btail++];
+        rx_btail &= BSIZE-1;
+        return rx_char;
+    }
+    // nothing here, should not have called
+    return 0;
+}
+
+// put a character into the tx buffer if there is room
+int uartPutChar( unsigned char c ) {
+    //if( tx_btail != ((tx_bhead + 1) & (BSIZE-1)) ) {
+    if( tx_size() < (BSIZE-1) ) {
+        P1OUT |= GRN_LED;
+        tx_buffer[tx_bhead++] = c;
+        tx_bhead &= BSIZE-1;
+        P1OUT &= ~ (GRN_LED);
+        // ensure interrupt enabled, sync w/ rx
+        CCR0 = CCR1 + TPH;
+        CCTL0 = CCIS0 + OUTMOD0 + CCIE;
+        return 0;
+    }
+    // full
+    return 1;
+}
+
+// current load in buffer, based on head/tail seperation
+unsigned int rx_size( void ) {
+    if( rx_btail <= rx_bhead ) {
+        return(rx_bhead - rx_btail);
+    } else {
+        return((rx_bhead + BSIZE) - rx_btail);
+    }
+}
+
+// current load in buffer, based on head/tail seperation
+unsigned int tx_size( void ) {
+    if( tx_btail <= tx_bhead ) {
+        return(tx_bhead - tx_btail);
+    } else {
+        return((tx_bhead + BSIZE) - tx_btail);
+    }
+}
+
+
 /* This continuously sends bits of the TXWord starting from the
  * least significant bit (the 0 start bit).  One bit is sent every
  * time the handler is activated.  When the bits run out, a new
- * byte is loaded from the data pointer, until bytestosend equals 0.
+ * byte is loaded from the data pointer, until tx_btail catches up
+ * to tx_bhead.
  */
 void TimerA0 (void) __attribute__((interrupt(TIMERA0_VECTOR)));
 void TimerA0(void) {
-    if( txbitcnt ) {
+    if( tx_bitcnt ) {
         /* send least significant bit */
         if( TXWord & 0x01 ) {
             CCTL0 &= ~ OUTMOD2;
@@ -85,40 +142,42 @@ void TimerA0(void) {
             CCTL0 |= OUTMOD2;
         }
         TXWord >>= 1;
-        txbitcnt --;
+        tx_bitcnt --;
     }
 
     /* If there are no bits left, load the next byte */
-    if( !txbitcnt ) {
-        if( bytestosend ) {
+    if( !tx_bitcnt ) {
+        //if( tx_btail != tx_bhead ) {
+        if( tx_size() > 0 ) {
             /* load next byte with stop bit 0x100 and shifted left
              * to make the start bit */
-            TXWord = ( 0x100 | buffer[btail++]) << 1;
-            btail &= BSIZE-1;
-            bytestosend --;
-
+            TXWord = ( 0x100 | tx_buffer[tx_btail++]) << 1;
+            tx_btail &= (BSIZE - 1);
             /* 1 start bit + 8 data bits + 1 stop bit */
-            txbitcnt = 10;
+            tx_bitcnt = 10;
         } else {
             /* turn off interrupts if not receiving */
-            if( ! rxbitcnt ) CCTL0 &= ~ CCIE;
+            if( ! rx_bitcnt ) CCTL0 &= ~ CCIE;
         }
     }
+
 
     /* add ticks per bit to trigger again on next bit in stream */
     CCR0 += TPB;
     /* reset the interrupt flag */
     CCTL0 &= ~CCIFG;
+
 }
 
 void RX_Start( void ) {
     /* Make ready to receive character.  Syncronize, negative edge
      * capture, enable interrupts.
      */
-    rxbitcnt = 8;
+    rx_bitcnt = 8;
     CCTL1 = SCS + OUTMOD0 + CM1 + CAP + CCIE;
 }
 
+// receive interrupt
 void TimerA1 (void) __attribute__((interrupt(TIMERA1_VECTOR)));
 void TimerA1(void) {
     /* If we just caught the 0 start bit, then turn off capture
@@ -127,8 +186,9 @@ void TimerA1(void) {
      * each bit.
      */
     if( CCTL1 & CAP ) {
+        P1OUT |= RED_LED;
         /* 8 bits pending */
-        rxbitcnt = 8;
+        rx_bitcnt = 8;
 
         /* next interrupt in 1.5 bits (i.e. in middle of next bit) */
         CCR1 += TPH + TPB;
@@ -153,17 +213,22 @@ void TimerA1(void) {
     if( CCTL1 & SCCI ) {
         RXByte |= 0x80;
     }
-    rxbitcnt --;
+    rx_bitcnt --;
+
 
     /* last bit received */
-    if( ! rxbitcnt ) {
+    if( ! rx_bitcnt ) {
         /* Record this byte and reset for next.
          * Put character in circular buffer (unless full).
          */
-        if( bytestosend < BSIZE ) {
-            buffer[bhead++] = RXByte;
-            bhead &= BSIZE-1;
-            bytestosend ++;
+        // all indications, this block working as it should
+        if( rx_btail != ((rx_bhead + 1) & (BSIZE-1)) ) {
+        //if( rx_size() < (BSIZE-1) ) {
+            rx_buffer[rx_bhead++] = RXByte;
+            rx_bhead &= BSIZE-1;
+            P1OUT &= ~ (RED_LED);
+            // wakeup, as program may want to process received data
+            __bic_SR_register_on_exit(LPM0_bits);
         }
 
         /* we're done, reset to capture */
