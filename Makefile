@@ -12,7 +12,7 @@ FREQ=1
 # TARGET: name of the output file
 TARGET = main
 # MCU: part number to build for
-MCU = msp430g2231
+MCU = msp430g2211
 # SOURCES: list of input source sources
 SOURCES = main.c 
 # INCLUDES: list of includes, by default, use Includes directory

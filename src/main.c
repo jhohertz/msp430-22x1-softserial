@@ -1,5 +1,5 @@
 
-#include <msp430g2231.h>
+#include <msp430g2211.h>
 
 /* Demo UART application.  Receives bytes from the computer
  * at 2400 bps, and sends the same byte back to the computer.
@@ -26,8 +26,9 @@ unsigned int tx_bitcnt = 0;
 
 /* a circular buffer to for characters received/to send */
 #define BSIZE 16                // must be power of 2
-unsigned char rx_buffer[BSIZE];
-unsigned char tx_buffer[BSIZE];
+//volatile static volatile char * gUartRxBuffer = 0;
+volatile char rx_buffer[BSIZE];
+volatile char tx_buffer[BSIZE];
 volatile unsigned int rx_bhead=0, rx_btail=0, tx_bhead=0, tx_btail=0;
 
 /* function prototypes */
@@ -35,8 +36,9 @@ void initUart( void );
 inline void RX_Start( void );
 unsigned int rx_size( void );
 unsigned int tx_size( void );
-unsigned char uartGetChar( void );
-int uartPutChar( unsigned char );
+const char uartGetChar( void );
+int uartPutChar( const char );
+void uartPrint(const char * );
 
 void main(void) {
     /* stop the watchdog timer */
@@ -50,6 +52,22 @@ void main(void) {
 
     /* Start listening for data */
     RX_Start();
+
+    //uartPrint("Hello World!\n");
+    uartPutChar('H');
+    uartPutChar('e');
+    uartPutChar('l');
+    uartPutChar('l');
+    uartPutChar('o');
+    uartPutChar(' ');
+    uartPutChar('W');
+    uartPutChar('o');
+    uartPutChar('r');
+    uartPutChar('l');
+    uartPutChar('d');
+    uartPutChar('!');
+    uartPutChar('\n');
+    uartPutChar('\r');
 
     for( ; ; ) {
         //if( rx_btail != rx_bhead ) {
@@ -79,10 +97,10 @@ void initUart( void ) {
     P1DIR |= TXD;
 }
 
-unsigned char uartGetChar( void ) {
+const char uartGetChar( void ) {
     //if( rx_btail != rx_bhead ) {
     if(rx_size() > 0) {
-        unsigned char rx_char = rx_buffer[rx_btail++];
+        const char rx_char = rx_buffer[rx_btail++];
         rx_btail &= BSIZE-1;
         return rx_char;
     }
@@ -90,8 +108,18 @@ unsigned char uartGetChar( void ) {
     return 0;
 }
 
+/* Print a NULL terminated string over UART.
+ * string - null terminated sting to transmit over UART. */
+void uartPrint(const char *s)
+{
+    while (*s) 
+    {
+        uartPutChar(*s++);
+    }
+}
+
 // put a character into the tx buffer if there is room
-int uartPutChar( unsigned char c ) {
+int uartPutChar( const char c ) {
     //if( tx_btail != ((tx_bhead + 1) & (BSIZE-1)) ) {
     if( tx_size() < (BSIZE-1) ) {
         P1OUT |= GRN_LED;
@@ -101,7 +129,13 @@ int uartPutChar( unsigned char c ) {
         //CCR0 = CCR1 + TPH;
         //CCTL0 = CCIS0 + OUTMOD0 + CCIE;
         // ensure interrupt enabled for send
-        CCTL0 |= CCIE;
+        if( ! (CCTL0 & CCIE) ) {
+           // CCTL0 |= CCIE;
+           CCR0 = TAR;         // Current state of TA counter
+           CCR0 += TPB;        // One bit time till first bit
+	   CCTL0 = OUTMOD0 + CCIE;
+           //CCTL0 = CCIS0 + OUTMOD0 + CCIE;
+        }
         return 0;
     }
     // full
@@ -178,6 +212,11 @@ void RX_Start( void ) {
      */
     rx_bitcnt = 8;
     CCTL1 = SCS + OUTMOD0 + CM1 + CAP + CCIE;
+    // sync tx on half intervals of rx
+    //CCR0 = CCR1 + TPH;
+    //CCTL0 = CCIS0 + OUTMOD0 + CCIE;
+    //CCTL0 = CCIS0 + OUTMOD0;
+
 }
 
 // receive interrupt
