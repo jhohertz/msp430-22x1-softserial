@@ -53,22 +53,7 @@ void main(void) {
     /* Start listening for data */
     RX_Start();
 
-    //uartPrint("Hello World!\n");
-    uartPutChar('H');
-    uartPutChar('e');
-    uartPutChar('l');
-    uartPutChar('l');
-    uartPutChar('o');
-    uartPutChar(' ');
-    uartPutChar('W');
-    uartPutChar('o');
-    uartPutChar('r');
-    uartPutChar('l');
-    uartPutChar('d');
-    uartPutChar('!');
-    uartPutChar('\n');
-    uartPutChar('\r');
-
+    uartPrint("Hello World!\n\r");
     for( ; ; ) {
         //if( rx_btail != rx_bhead ) {
         while(rx_size() > 0) {
