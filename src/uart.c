@@ -18,11 +18,6 @@ volatile char tx_buffer[BSIZE];
 volatile unsigned int rx_bhead=0, rx_btail=0, tx_bhead=0, tx_btail=0;
 
 void initUart( void ) {
-    /* set up the clocks for 1 mhz */
-    BCSCTL1 = CALBC1_1MHZ;
-    DCOCTL = CALDCO_1MHZ;
-    BCSCTL2 &= ~(DIVS_3);
-
     /* Set timer A to use continuous mode 1 mhz / 8 = 125 khz. */
     TACTL = TASSEL_2 + MC_2 + ID_3;
 
@@ -36,7 +31,6 @@ void initUart( void ) {
 }
 
 const char uartGetChar( void ) {
-    //if( rx_btail != rx_bhead ) {
     if(rx_size() > 0) {
         const char rx_char = rx_buffer[rx_btail++];
         rx_btail &= BSIZE-1;
@@ -58,20 +52,14 @@ void uartPrint(const char *s)
 
 // put a character into the tx buffer if there is room
 int uartPutChar( const char c ) {
-    //if( tx_btail != ((tx_bhead + 1) & (BSIZE-1)) ) {
     if( tx_size() < (BSIZE-1) ) {
         tx_buffer[tx_bhead++] = c;
         tx_bhead &= BSIZE-1;
-        // ensure interrupt enabled, sync w/ rx
-        //CCR0 = CCR1 + TPH;
-        //CCTL0 = CCIS0 + OUTMOD0 + CCIE;
         // ensure interrupt enabled for send
         if( ! (CCTL0 & CCIE) ) {
-           // CCTL0 |= CCIE;
            CCR0 = TAR;         // Current state of TA counter
            CCR0 += TPB;        // One bit time till first bit
 	   CCTL0 = OUTMOD0 + CCIE;
-           //CCTL0 = CCIS0 + OUTMOD0 + CCIE;
         }
         return 0;
     }

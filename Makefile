@@ -14,7 +14,7 @@ TARGET = main
 # MCU: part number to build for
 MCU = msp430g2211
 # SOURCES: list of input source sources
-SOURCES = main.c uart.c
+SOURCES = main.c uart.c strings.c cli.c cli_commands.c
 # INCLUDES: list of includes, by default, use Includes directory
 INCLUDES = -Isrc/include
 # OUTDIR: directory to use for output
