@@ -53,7 +53,7 @@ void main(void) {
 
     for( ; ; ) {
         //if( rx_btail != rx_bhead ) {
-        if(rx_size() > 0) {
+        while(rx_size() > 0) {
             uartPutChar(uartGetChar());
         }
         /* go to sleep and wait for data */
@@ -97,10 +97,11 @@ int uartPutChar( unsigned char c ) {
         P1OUT |= GRN_LED;
         tx_buffer[tx_bhead++] = c;
         tx_bhead &= BSIZE-1;
-        P1OUT &= ~ (GRN_LED);
         // ensure interrupt enabled, sync w/ rx
-        CCR0 = CCR1 + TPH;
-        CCTL0 = CCIS0 + OUTMOD0 + CCIE;
+        //CCR0 = CCR1 + TPH;
+        //CCTL0 = CCIS0 + OUTMOD0 + CCIE;
+        // ensure interrupt enabled for send
+        CCTL0 |= CCIE;
         return 0;
     }
     // full
@@ -147,8 +148,10 @@ void TimerA0(void) {
 
     /* If there are no bits left, load the next byte */
     if( !tx_bitcnt ) {
+        P1OUT &= ~ (GRN_LED);
         //if( tx_btail != tx_bhead ) {
         if( tx_size() > 0 ) {
+            P1OUT |= GRN_LED;
             /* load next byte with stop bit 0x100 and shifted left
              * to make the start bit */
             TXWord = ( 0x100 | tx_buffer[tx_btail++]) << 1;
@@ -227,12 +230,13 @@ void TimerA1(void) {
             rx_buffer[rx_bhead++] = RXByte;
             rx_bhead &= BSIZE-1;
             P1OUT &= ~ (RED_LED);
-            // wakeup, as program may want to process received data
-            __bic_SR_register_on_exit(LPM0_bits);
         }
 
         /* we're done, reset to capture */
         CCTL1 = SCS + OUTMOD0 + CM1 + CAP + CCIE;
+
+        // wakeup, as program may want to process received data
+        __bic_SR_register_on_exit(LPM0_bits);
 
         return;
     }
