@@ -13,7 +13,11 @@ There is a reasonable makefile, which will work with apt-get installed msp430 to
 #### Limitations
 
 - There is no hardware flow control. (Though this could be done if you wanted to devote the pins to it). Not in current plans
-- It is locked to 2400 bps
+- It is locked to 2400 bps, 8-bit, no parity, 1 stop bit
 - It assumes you are running of the internal 1Mhz clock source, which is the fasted calibrated source without adding a crystal. This is the scope for now.
+- After programming, it seems you need to disconnect/reconnect the launchpad to get at the terminal. I am using:
+  ```
+  screen /dev/ttyACM0 2400
+  ```
 
 
