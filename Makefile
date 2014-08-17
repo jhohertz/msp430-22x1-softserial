@@ -82,4 +82,9 @@ $(OUTDIR):
 clean:
 	-$(RM) -r $(OUTDIR)/
 
+# program a connected device on a launchpad in a default config:
+program: all
+	mspdebug rf2500 --fet-force-id MSP430G2231 erase
+	mspdebug rf2500 --fet-force-id MSP430G2231 "load build/main.hex"
+
 .PHONY: all clean
