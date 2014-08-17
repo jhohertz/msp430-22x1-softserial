@@ -46,7 +46,9 @@ void uartPrint(const char *s)
 {
     while (*s) 
     {
-        uartPutChar(*s++);
+        // keep trying if buffer was full
+        while(uartPutChar(*s));
+	s++;
     }
 }
 

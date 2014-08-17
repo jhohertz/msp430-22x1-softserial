@@ -25,6 +25,9 @@ int main(void) {
     /* Start listening for data */
     UART_Start();
 
+    /* enable interrupts */
+    __bis_SR_register( GIE );
+
     uartPrint("Cli Started.\n\r");
     cliHelp();
     uartPrint(PROMPT);
@@ -37,6 +40,6 @@ int main(void) {
             cli_input(in_char);
         }
         /* go to sleep and wait for data */
-        __bis_SR_register( LPM0_bits + GIE );
+        __bis_SR_register( LPM0_bits );
     }
 }
