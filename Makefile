@@ -38,6 +38,7 @@ AS      	= msp430-gcc
 GASP    	= msp430-gasp
 NM      	= msp430-nm
 OBJCOPY 	= msp430-objcopy
+OBJDUMP 	= msp430-objdump
 MAKETXT 	= srec_cat
 UNIX2DOS	= unix2dos
 RM      	= rm -f
@@ -51,7 +52,7 @@ DEPEND = $(SOURCES:.c=.d)
 OBJECTS = $(addprefix $(OUTDIR)/,$(notdir $(SOURCES:.c=.o)))
 
 # default: build hex file and TI TXT file
-all: $(OUTDIR)/$(TARGET).hex $(OUTDIR)/$(TARGET).txt
+all: $(OUTDIR)/$(TARGET).hex $(OUTDIR)/$(TARGET).txt $(OUTDIR)/$(TARGET).lst
 
 # TI TXT file
 $(OUTDIR)/%.txt: $(OUTDIR)/%.hex
@@ -66,15 +67,12 @@ $(OUTDIR)/%.hex: $(OUTDIR)/%.elf
 $(OUTDIR)/$(TARGET).elf: $(OBJECTS)
 	$(CC) $(OBJECTS) $(LDFLAGS) $(LIBS) -o $@
 
+# assembly listing
+$(OUTDIR)/%.lst: $(OUTDIR)/%.elf
+	$(OBJDUMP) -d -S $< > $@
+
 $(OUTDIR)/%.o: src/%.c | $(OUTDIR)
 	$(CC) -c $(CFLAGS) $(CPPFLAGS) -o $@ $<
-
-$(OUTDIR)/%.s: src/%.c | $(OUTDIR)
-	$(CC) -c $(CFLAGS) $(CPPFLAGS) -S $< -o $@
-
-# assembly listing
-$(OUTDIR)/%.lst: src/%.c
-	$(CC) -c $(CFLAGS) $(CPPFLAGS) -Wa,-anlhd $< > $@
 
 # create the output directory
 $(OUTDIR):
@@ -82,6 +80,6 @@ $(OUTDIR):
 
 # remove build artifacts and executables
 clean:
-	-$(RM) $(OUTDIR)/*
+	-$(RM) -r $(OUTDIR)/
 
 .PHONY: all clean
