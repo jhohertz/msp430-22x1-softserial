@@ -28,7 +28,7 @@ int main(void) {
     /* enable interrupts */
     __bis_SR_register( GIE );
 
-    uartPrint("Cli Started.\n\r");
+    uartPrint("\n\rCli Started.\n\r");
     cliHelp();
     uartPrint(PROMPT);
 
