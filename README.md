@@ -17,9 +17,7 @@ To demonstrate the use of the serial, an example CLI implementation adapted from
 
 After programming, it seems you need to disconnect/reconnect the launchpad to get at the terminal. I am using this to access the CLI after re-connecting:
 
-    ```
     screen /dev/ttyACM0 2400
-    ```
 
 #### Limitations
 
